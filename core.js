@@ -21,7 +21,7 @@
       total+=bytes;
     }
     if(total>MAX_TOTAL) throw Error('一条记录的附件合计不能超过 160 MB。');
-    return {id:r.id,type:r.type,date:r.date,title:r.title.trim(),notes:r.notes,weight:r.weight,media:r.media.map(m=>({name:m.name,mime:m.mime,data:m.data})),createdAt:typeof r.createdAt==='string'?r.createdAt:new Date().toISOString(),updatedAt:typeof r.updatedAt==='string'?r.updatedAt:new Date().toISOString()};
+    return {id:r.id,type:r.type,favorite:r.favorite===true,date:r.date,title:r.title.trim(),notes:r.notes,weight:r.weight,media:r.media.map(m=>({name:m.name,mime:m.mime,data:m.data})),createdAt:typeof r.createdAt==='string'?r.createdAt:new Date().toISOString(),updatedAt:typeof r.updatedAt==='string'?r.updatedAt:new Date().toISOString()};
   }
   function profile(p) {
     if(!p || typeof p.name!=='string' || p.name.trim().length<1 || p.name.length>40) throw Error('名字请填写 1–40 字。');
@@ -59,7 +59,7 @@
   }
   function select(records,{type,month='',query='',ascending=false}) {
     const q=query.trim().toLocaleLowerCase();
-    return records.filter(r=>r.type===type && (!month||r.date.slice(0,7)===month) && (!q||(r.title+' '+r.notes).toLocaleLowerCase().includes(q))).sort((a,b)=>ascending?a.date.localeCompare(b.date):b.date.localeCompare(a.date));
+    return records.filter(r=>(r.type===type || type==='memory'&&r.type==='growth'&&r.favorite===true) && (!month||r.date.slice(0,7)===month) && (!q||(r.title+' '+r.notes).toLocaleLowerCase().includes(q))).sort((a,b)=>ascending?a.date.localeCompare(b.date):b.date.localeCompare(a.date));
   }
   const api={MIME,MAX_FILE,MAX_TOTAL,dateOK,validateRecord,profile,backup,select};
   if(typeof module==='object' && module.exports) module.exports=api; else root.BookCore=api;
