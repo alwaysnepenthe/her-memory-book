@@ -7,10 +7,11 @@ async function until(fn){for(let i=0;i<120;i++){if(fn())return;await delay(10);}
 async function launch(factory,cleanup){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://example.invalid/',runScripts:'outside-only'}),w=dom.window;cleanup.push(()=>w.close());
  w.indexedDB=factory;w.structuredClone=structuredClone;w.scrollTo=()=>{};
+ w.matchMedia=()=>({matches:false});w.requestAnimationFrame=fn=>{w.nextFrame=fn;return 1;};Object.defineProperty(w.document,'hidden',{value:false,configurable:true});
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};w.HTMLMediaElement.prototype.pause=function(){};
  w.URL.createObjectURL=b=>{w.exported=b;return 'blob:test';};w.URL.revokeObjectURL=()=>{};w.HTMLAnchorElement.prototype.click=function(){};
  const $=s=>w.document.querySelector(s),errors=[];w.addEventListener('error',e=>errors.push(e.error));
- for(const f of ['seed.js','core.js','app.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
+ for(const f of ['seed.js','core.js','journal.js','app.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
  await until(()=>$('#saveState').textContent.includes('条记录'));
  return {w,$,errors,submit:s=>$(s).dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})),change:s=>$(s).dispatchEvent(new w.Event('change',{bubbles:true}))};
 }
@@ -42,9 +43,27 @@ test('empty public app, uploads, persistence, CRUD and full backup',async()=>{
  a.$('#exportButton').click();await until(()=>a.w.exported);const pack=await new Promise(resolve=>{const r=new a.w.FileReader();r.onload=()=>resolve(JSON.parse(r.result));r.readAsText(a.w.exported);});assert.equal(pack.version,3);assert.equal(pack.profile.avatar,png);assert.equal(pack.records.length,2);
  const b=await launch(new IDBFactory(),cleanup);
  async function restore(){Object.defineProperty(b.$('#importInput'),'files',{value:[{size:JSON.stringify(pack).length,text:async()=>JSON.stringify(pack)}],configurable:true});b.change('#importInput');await until(()=>!b.$('#importPreview').hidden);b.$('#restoreProfile').checked=true;b.$('#confirmImport').click();await until(()=>b.$('#importPreview').hidden);}
- await restore();assert.equal(b.$('#profilePhoto').src,png);assert.equal(b.$('#profileBirthPlace').value,'测试地点');assert.ok(b.$('#growthList video').src.startsWith('data:video/mp4'));
+ await restore();assert.equal(b.$('#profilePhoto').src,png);assert.equal(b.$('#profileBirthPlace').value,'测试地点');b.$('#openBook').click();assert.ok(b.$('#growthList video').src.startsWith('data:video/mp4'));
  await restore();assert.ok(b.$('#backupStatus').textContent.includes('0 条新记录'));
  b.$('#memoryList .memory-cover').click();b.$('#deleteRecord').click();assert.equal(b.$('#confirmDialog').open,true);b.$('[data-close="confirmDialog"]').click();assert.ok(b.$('#saveState').textContent.includes('2 条'));b.$('#deleteRecord').click();b.$('#confirmDelete').click();await until(()=>b.$('#saveState').textContent.includes('1 条'));
  for(const app of [a,b,reload])assert.equal(app.errors.length,0);
+ }finally{cleanup.forEach(f=>f());}
+});
+test('book cover, bidirectional page turns, demo isolation and photo-strip pause',async()=>{
+ const cleanup=[];try{
+ const a=await launch(new IDBFactory(),cleanup);a.$('[data-view="growth"]').click();
+ assert.equal(a.$('#bookCoverStage').hidden,false);assert.equal(a.w.PawJournal.getState().count,4);assert.ok(!a.$('#demoNotice').hidden);
+ a.$('#openBook').click();assert.equal(a.$('#bookReader').hidden,false);assert.equal(a.$('#previousPage').disabled,true);assert.ok(a.$('#bookLeft').textContent.includes('到家的第一个下午'));
+ a.$('#nextPage').click();a.$('#nextPage').click();await until(()=>!a.w.PawJournal.getState().turning);assert.equal(a.w.PawJournal.getState().index,1);
+ a.$('#previousPage').click();await until(()=>!a.w.PawJournal.getState().turning);assert.equal(a.w.PawJournal.getState().index,0);
+ for(let i=0;i<2;i++){a.$('#nextPage').click();await until(()=>!a.w.PawJournal.getState().turning);}
+ assert.ok(a.$('#bookRight video').controls);assert.ok(a.$('#bookRight').textContent.includes('非真实录像'));
+ a.$('#nextPage').click();await until(()=>!a.w.PawJournal.getState().turning);assert.equal(a.$('#nextPage').disabled,true);
+ a.$('#exportButton').click();await until(()=>a.w.exported);const pack=await new Promise(resolve=>{const r=new a.w.FileReader();r.onload=()=>resolve(JSON.parse(r.result));r.readAsText(a.w.exported);});assert.equal(pack.records.length,0,'demos never enter backups');
+ a.$('#bookMode').value='real';a.change('#bookMode');assert.equal(a.w.PawJournal.getState().count,0);assert.ok(a.$('#bookLeft').textContent.includes('等你来写'));
+ a.$('[data-view="home"]').click();const strip=a.$('#originalGrid');Object.defineProperty(strip,'scrollWidth',{value:900,configurable:true});Object.defineProperty(strip,'clientWidth',{value:300,configurable:true});
+ a.w.nextFrame(1000);a.w.nextFrame(1045);assert.ok(strip.scrollLeft>0);const current=strip.scrollLeft;a.$('#photoMotionToggle').click();a.w.nextFrame(1090);assert.equal(strip.scrollLeft,current);
+ a.$('#photoMotionToggle').click();strip.scrollLeft=599.8;a.w.nextFrame(1135);assert.equal(strip.scrollLeft,600);a.w.nextFrame(1180);assert.ok(strip.scrollLeft<600,'reverses at end');
+ strip.dispatchEvent(new a.w.Event('pointerenter'));const held=strip.scrollLeft;a.w.nextFrame(1225);assert.equal(strip.scrollLeft,held);assert.equal(a.errors.length,0);
  }finally{cleanup.forEach(f=>f());}
 });

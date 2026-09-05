@@ -1,9 +1,11 @@
 {
-  "name": "her-memory-book",
-  "version": "0.3.0",
+  "name": "paw-journal",
+  "version": "0.4.0",
   "private": true,
-  "description": "A local-first pet profile, growth journal and memory book.",
-  "engines": {"node": "^22.22.2 || ^24.15.0 || >=26.0.0"},
+  "description": "A local-first pet daily journal with an ornate botanical book cover, page turns, profiles and media.",
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
   "scripts": {
     "dev": "node scripts/serve.cjs",
     "build": "node scripts/build.cjs",
