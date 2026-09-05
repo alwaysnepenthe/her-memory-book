@@ -21,11 +21,28 @@
   ];
   let config={records:[],pet:{name:'点点'},filters:{type:'growth',ascending:true}},rows=[],index=0,mode='auto',opened=false,turning=false,opening=false,openTimer,midTimer,endTimer;
   host.className='journal-stage';
-  host.innerHTML=`<div class="journal-topline"><div class="growth-view-switch" role="group" aria-label="成长记录展示方式"><button id="showBook" type="button">翻页手账</button><button id="showWeb" type="button">网页记录</button></div><label class="motion-choice">翻页效果 <select id="bookMotion"><option value="on">柔和动画</option><option value="off">静态切换</option></select></label><label>正在翻阅 <select id="bookMode"><option value="real">我的记录</option><option value="demo">灵感手账</option></select></label></div>
+  host.innerHTML=`<div class="journal-topline"><div class="growth-view-switch" role="group" aria-label="成长记录展示方式"><button id="showBook" type="button">翻页手账</button><button id="showWeb" type="button">网页记录</button></div><div class="journal-choice motion-choice">翻页效果 <select id="bookMotion"><option value="on">柔和动画</option><option value="off">静态切换</option></select></div><div class="journal-choice">正在翻阅 <select id="bookMode"><option value="real">我的记录</option><option value="demo">灵感手账</option></select></div></div>
   <div id="bookCoverStage" class="book-cover-stage"><button id="openBook" class="book-cover" aria-label="打开成长手账"><span class="cover-spine" aria-hidden="true"></span><span class="cover-title">成长手账<small>OUR GROWING DAYS</small></span><span class="cover-photo"><img id="bookCoverPhoto" alt="成长手账封面的宠物照片"></span><span class="cover-pet" id="bookPetName"></span><span class="cover-invitation">轻轻翻开 · 从这一页开始</span></button><p class="cover-shadow-caption" id="coverCount"></p></div>
   <div id="bookReader" class="book-reader" hidden><div class="reader-tools"><button id="closeBook" class="text-button">↶ 合上手账</button><span>左边写日常，右边贴照片。</span><div class="reader-edit-actions"><button id="bookEdit" class="text-button">✎ 编辑本页</button><button id="bookAdd" class="text-button">＋ 写新的一页</button></div></div>
   <div id="bookSpread" class="book-spread" role="group" aria-label="成长手账书页"><section id="bookLeft" class="paper-page paper-left"></section><section id="bookRight" class="paper-page paper-right"></section><div class="book-binding" aria-hidden="true"></div><div id="turnLeaf" class="turn-leaf" aria-hidden="true" inert hidden><div class="turn-front"></div><div class="turn-back"></div></div></div>
   <nav class="book-navigation" aria-label="手账翻页"><button id="previousPage" class="page-arrow" aria-label="上一条记录">← 上一页</button><span id="bookPageStatus" role="status" aria-live="polite"></span><button id="nextPage" class="page-arrow" aria-label="下一条记录">下一页 →</button></nav><p class="reader-hint">也可以用键盘 ← → 翻页 · 图片可点开，视频可直接播放</p></div><div id="growthWeb" class="growth-web" hidden></div>`;
+
+  const journalMenus=[];
+  function syncJournalMenus(){journalMenus.forEach(m=>m.sync());}
+  function makeJournalMenu(id,label){
+    const select=$('#'+id),wrap=el('div','journal-select'),trigger=el('button','journal-select-trigger'),list=el('div','journal-select-options');
+    select.hidden=true;select.tabIndex=-1;select.setAttribute('aria-hidden','true');select.parentNode.insertBefore(wrap,select);wrap.append(select,trigger,list);
+    trigger.type='button';trigger.id=id+'Trigger';trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-expanded','false');trigger.setAttribute('aria-controls',id+'Options');list.id=id+'Options';list.role='listbox';list.setAttribute('aria-label',label);list.hidden=true;
+    const choices=[...select.options].map(option=>{const button=el('button','journal-select-option',option.textContent);button.type='button';button.role='option';button.tabIndex=-1;button.dataset.value=option.value;button.onclick=()=>{select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));sync();close(true);};list.append(button);return button;});
+    function sync(){trigger.textContent=select.selectedOptions[0]?.textContent||'';trigger.setAttribute('aria-label',label+'：'+trigger.textContent);choices.forEach(b=>b.setAttribute('aria-selected',String(b.dataset.value===select.value)));}
+    function close(focus=false){list.hidden=true;trigger.setAttribute('aria-expanded','false');if(focus)trigger.focus();}
+    function open(){journalMenus.forEach(m=>m.close());sync();list.hidden=false;trigger.setAttribute('aria-expanded','true');(choices.find(b=>b.dataset.value===select.value)||choices[0]).focus();}
+    trigger.onclick=()=>list.hidden?open():close();trigger.onkeydown=e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();open();}};
+    list.onkeydown=e=>{const n=choices.indexOf(document.activeElement);if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(true);}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?choices.length-1:(n+(e.key==='ArrowDown'?1:-1)+choices.length)%choices.length;choices[next].focus();}else if(e.key==='Tab')close();};
+    wrap.addEventListener('focusout',e=>{if(!wrap.contains(e.relatedTarget))close();});document.addEventListener('pointerdown',e=>{if(!wrap.contains(e.target))close();});select.addEventListener('change',sync);journalMenus.push({sync,close});sync();
+  }
+  makeJournalMenu('bookMotion','翻页效果');makeJournalMenu('bookMode','正在翻阅');
+
   function isDemo(){return mode==='demo'||mode==='auto'&&!config.records.some(r=>r.type==='growth');}
   function pauseVideos(){host.querySelectorAll('video').forEach(v=>v.pause());}
   function cancelTurn(){clearTimeout(midTimer);clearTimeout(endTimer);turning=false;$('#turnLeaf').hidden=true;$('#turnLeaf').classList.remove('flipping-next','flipping-prev');$('#bookSpread').classList.remove('is-turning');}
@@ -53,14 +70,14 @@
   function syncLayout(){pauseVideos();$('#showBook').setAttribute('aria-pressed',String(layout==='book'));$('#showWeb').setAttribute('aria-pressed',String(layout==='web'));$('#growthWeb').hidden=layout!=='web';$('#bookCoverStage').hidden=layout!=='book'||opened;$('#bookReader').hidden=layout!=='book'||!opened;if(layout==='web')webDraw();else $('#growthWeb').replaceChildren();}
   function chooseLayout(value){setOpen(false);layout=value;try{localStorage.setItem('pet-journal-layout',value);}catch{}syncLayout();}
   $('#showBook').onclick=()=>chooseLayout('book');$('#showWeb').onclick=()=>chooseLayout('web');
-  $('#bookMotion').value=motion?'on':'off';host.classList.toggle('motion-enabled',motion);$('#bookMotion').onchange=()=>{motion=$('#bookMotion').value==='on';host.classList.toggle('motion-enabled',motion);if(opening)setOpen(true);cancelTurn();if(opened)draw();};
+  $('#bookMotion').value=motion?'on':'off';syncJournalMenus();host.classList.toggle('motion-enabled',motion);$('#bookMotion').onchange=()=>{motion=$('#bookMotion').value==='on';host.classList.toggle('motion-enabled',motion);if(opening)setOpen(true);cancelTurn();if(opened)draw();};
   function draw(){
     pauseVideos();$('#bookLeft').replaceChildren(pageContent(rows[index],index,'left'));$('#bookRight').replaceChildren(pageContent(rows[index],index,'right'));
     $('#bookPageStatus').textContent=rows.length?'第 '+(index+1)+' / '+rows.length+' 条记录':'尚无记录';
     $('#previousPage').disabled=turning||index<=0;$('#nextPage').disabled=turning||index>=rows.length-1;$('#closeBook').disabled=turning;$('#bookEdit').disabled=turning||!rows.length;
     $('#bookSpread').dataset.recordId=rows[index]?.id||'';
   }
-  function cover(){const p=config.pet;$('#bookCoverPhoto').src=p.avatar||window.HER_SEED[p.portraitIndex??3]?.data||placeholder();$('#bookCoverPhoto').alt=(p.name||'宠物')+'的成长手账照片';$('#bookPetName').textContent=(p.name||'小伙伴')+'的小日子';$('#coverCount').textContent='共 '+rows.length+' 页小日常 · 轻触封面，慢慢翻开';$('#bookMode').value=isDemo()?'demo':'real';}
+  function cover(){const p=config.pet;$('#bookCoverPhoto').src=p.avatar||window.HER_SEED[p.portraitIndex??3]?.data||placeholder();$('#bookCoverPhoto').alt=(p.name||'宠物')+'的成长手账照片';$('#bookPetName').textContent=(p.name||'小伙伴')+'的小日子';$('#coverCount').textContent='共 '+rows.length+' 页小日常 · 轻触封面，慢慢翻开';$('#bookMode').value=isDemo()?'demo':'real';syncJournalMenus();}
   function setOpen(value){clearTimeout(openTimer);opening=false;host.classList.remove('book-opening');cancelTurn();opened=value;$('#bookCoverStage').hidden=value;$('#bookReader').hidden=!value;if(value)draw();else pauseVideos();syncLayout();}
   function snapshot(side){const copy=$(side).firstElementChild.cloneNode(true);copy.querySelectorAll('video').forEach(v=>{const still=el('div','journal-video-still','▶');v.replaceWith(still);});copy.querySelectorAll('button,a').forEach(n=>n.tabIndex=-1);return copy;}
   function turn(delta){const target=index+delta;if(opening||turning||target<0||target>=rows.length||!opened)return;pauseVideos();if(reduced()){index=target;draw();return;}
