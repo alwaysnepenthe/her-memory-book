@@ -3,7 +3,9 @@
   'use strict';
   const $=s=>document.querySelector(s),host=$('#growthList');
   const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
-  const reduced=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
+  let motion=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches!==true;
+  const reduced=()=>!motion;
+  let layout='book';try{layout=localStorage.getItem('pet-journal-layout')==='web'?'web':'book';}catch{};
   const placeholder=()=>window.HER_PLACEHOLDER||'assets/macaron-garden-v03.png';
   const photo=i=>window.HER_SEED[i]||{name:'花园小景',mime:'image/png',data:placeholder()};
   const video={name:'照片片段',mime:'video/mp4',data:'assets/demo-journal.mp4'};
@@ -15,24 +17,24 @@
   ];
   let config={records:[],pet:{name:'点点'},filters:{type:'growth',ascending:true}},rows=[],index=0,mode='auto',opened=false,turning=false,opening=false,openTimer,midTimer,endTimer;
   host.className='journal-stage';
-  host.innerHTML=`<div class="journal-topline"><span class="journal-kicker">OUR EVERYDAY JOURNAL</span><label>正在翻阅 <select id="bookMode"><option value="real">我的记录</option><option value="demo">灵感手账</option></select></label></div>
+  host.innerHTML=`<div class="journal-topline"><div class="growth-view-switch" role="group" aria-label="成长记录展示方式"><button id="showBook" type="button">翻页手账</button><button id="showWeb" type="button">网页记录</button></div><label class="motion-choice">翻页效果 <select id="bookMotion"><option value="on">柔和动画</option><option value="off">静态切换</option></select></label><label>正在翻阅 <select id="bookMode"><option value="real">我的记录</option><option value="demo">灵感手账</option></select></label></div>
   <div id="bookCoverStage" class="book-cover-stage"><button id="openBook" class="book-cover" aria-label="打开成长手账"><span class="cover-spine" aria-hidden="true"></span><span class="cover-title">成长手账<small>OUR GROWING DAYS</small></span><span class="cover-photo"><img id="bookCoverPhoto" alt="成长手账封面的宠物照片"></span><span class="cover-pet" id="bookPetName"></span><span class="cover-invitation">轻轻翻开 · 从这一页开始</span></button><p class="cover-shadow-caption" id="coverCount"></p></div>
   <div id="bookReader" class="book-reader" hidden><div class="reader-tools"><button id="closeBook" class="text-button">↶ 合上手账</button><span>左边写日常，右边贴照片。</span><div class="reader-edit-actions"><button id="bookEdit" class="text-button">✎ 编辑本页</button><button id="bookAdd" class="text-button">＋ 写新的一页</button></div></div>
   <div id="bookSpread" class="book-spread" role="group" aria-label="成长手账书页"><section id="bookLeft" class="paper-page paper-left"></section><section id="bookRight" class="paper-page paper-right"></section><div class="book-binding" aria-hidden="true"></div><div id="turnLeaf" class="turn-leaf" aria-hidden="true" inert hidden><div class="turn-front"></div><div class="turn-back"></div></div></div>
-  <nav class="book-navigation" aria-label="手账翻页"><button id="previousPage" class="page-arrow" aria-label="上一条记录">← 上一页</button><span id="bookPageStatus" role="status" aria-live="polite"></span><button id="nextPage" class="page-arrow" aria-label="下一条记录">下一页 →</button></nav><p class="reader-hint">也可以用键盘 ← → 翻页 · 图片可点开，视频可直接播放</p></div>`;
+  <nav class="book-navigation" aria-label="手账翻页"><button id="previousPage" class="page-arrow" aria-label="上一条记录">← 上一页</button><span id="bookPageStatus" role="status" aria-live="polite"></span><button id="nextPage" class="page-arrow" aria-label="下一条记录">下一页 →</button></nav><p class="reader-hint">也可以用键盘 ← → 翻页 · 图片可点开，视频可直接播放</p></div><div id="growthWeb" class="growth-web" hidden></div>`;
   function isDemo(){return mode==='demo'||mode==='auto'&&!config.records.some(r=>r.type==='growth');}
   function pauseVideos(){host.querySelectorAll('video').forEach(v=>v.pause());}
   function cancelTurn(){clearTimeout(midTimer);clearTimeout(endTimer);turning=false;$('#turnLeaf').hidden=true;$('#turnLeaf').classList.remove('flipping-next','flipping-prev');$('#bookSpread').classList.remove('is-turning');}
   function computeRows(){return BookCore.select(isDemo()?demos:config.records,config.filters);}
   function pageContent(record,n,side){
-    const content=el('div','paper-content');
+    const content=el('div','paper-content');content.append(el('span','botanical-corner corner-nw'),el('span','botanical-corner corner-ne'),el('span','botanical-corner corner-sw'),el('span','botanical-corner corner-se'));content.querySelectorAll('.botanical-corner').forEach(n=>n.setAttribute('aria-hidden','true'));
     const header=el('div','paper-heading');header.append(el('span','',side==='left'?(config.pet.name||'点点')+'日记':'把日常贴在这里'),el('span','','日常'));content.append(header);
     if(!record){content.append(el('span','paper-flourish','❦'),el('h2','','这一页，等你来写'),el('p','paper-notes',config.filters.month||config.filters.query?'这个筛选条件下还没有记录，试试清除筛选。':'选一天，贴一张照片，再写一点关于今天的小事。'));const add=el('button','button primary','＋ 写下第一条记录');add.onclick=()=>config.onAdd?.();content.append(add);return content;}
     if(side==='left'){
       const date=el('time','journal-date',record.date.replaceAll('-',' / '));date.dateTime=record.date;content.append(date,el('h2','journal-entry-title',record.title));
       if(record.weight!==null)content.append(el('span','journal-weight','今日体重  '+record.weight+' kg'));
       content.append(el('div','journal-rule','❧'),el('div','paper-notes',record.notes||'这一天的故事，先交给照片。'));
-      const foot=el('div','entry-actions'),edit=el('button','text-button','✎ 编辑本页');edit.onclick=()=>editCurrent();foot.append(edit);content.append(foot);
+      const foot=el('div','entry-actions'),edit=el('button','text-button','✎ 编辑本页');edit.onclick=()=>{if(turning||opening)return;pauseVideos();config.onEdit?.(record,isDemo());};foot.append(edit);content.append(foot);
     }else{
       const media=el('div','journal-media');if(!record.media.length){media.append(el('div','journal-no-photo','❦'),el('p','','今天先写文字，下次再贴照片。'));}
       record.media.forEach((m,i)=>{const figure=el('figure','journal-photo');
@@ -43,6 +45,11 @@
     }
     content.append(el('span','paper-number',String(n*2+(side==='left'?1:2)).padStart(2,'0')));return content;
   }
+  function webDraw(){const web=$('#growthWeb');web.replaceChildren();const list=rows.length?rows:[null];list.forEach((r,n)=>{const card=el('article','growth-web-card');if(r)card.dataset.recordId=r.id;card.append(pageContent(r,n,'left'),pageContent(r,n,'right'));web.append(card);});}
+  function syncLayout(){pauseVideos();$('#showBook').setAttribute('aria-pressed',String(layout==='book'));$('#showWeb').setAttribute('aria-pressed',String(layout==='web'));$('#growthWeb').hidden=layout!=='web';$('#bookCoverStage').hidden=layout!=='book'||opened;$('#bookReader').hidden=layout!=='book'||!opened;if(layout==='web')webDraw();else $('#growthWeb').replaceChildren();}
+  function chooseLayout(value){setOpen(false);layout=value;try{localStorage.setItem('pet-journal-layout',value);}catch{}syncLayout();}
+  $('#showBook').onclick=()=>chooseLayout('book');$('#showWeb').onclick=()=>chooseLayout('web');
+  $('#bookMotion').value=motion?'on':'off';host.classList.toggle('motion-enabled',motion);$('#bookMotion').onchange=()=>{motion=$('#bookMotion').value==='on';host.classList.toggle('motion-enabled',motion);if(opening)setOpen(true);cancelTurn();if(opened)draw();};
   function draw(){
     pauseVideos();$('#bookLeft').replaceChildren(pageContent(rows[index],index,'left'));$('#bookRight').replaceChildren(pageContent(rows[index],index,'right'));
     $('#bookPageStatus').textContent=rows.length?'第 '+(index+1)+' / '+rows.length+' 条记录':'尚无记录';
@@ -50,27 +57,27 @@
     $('#bookSpread').dataset.recordId=rows[index]?.id||'';
   }
   function cover(){const p=config.pet;$('#bookCoverPhoto').src=p.avatar||window.HER_SEED[p.portraitIndex??3]?.data||placeholder();$('#bookCoverPhoto').alt=(p.name||'宠物')+'的成长手账照片';$('#bookPetName').textContent=(p.name||'小伙伴')+'的小日子';$('#coverCount').textContent='共 '+rows.length+' 页小日常 · 轻触封面，慢慢翻开';$('#bookMode').value=isDemo()?'demo':'real';}
-  function setOpen(value){clearTimeout(openTimer);opening=false;host.classList.remove('book-opening');cancelTurn();opened=value;$('#bookCoverStage').hidden=value;$('#bookReader').hidden=!value;if(value)draw();else pauseVideos();}
+  function setOpen(value){clearTimeout(openTimer);opening=false;host.classList.remove('book-opening');cancelTurn();opened=value;$('#bookCoverStage').hidden=value;$('#bookReader').hidden=!value;if(value)draw();else pauseVideos();syncLayout();}
   function snapshot(side){const copy=$(side).firstElementChild.cloneNode(true);copy.querySelectorAll('video').forEach(v=>{const still=el('div','journal-video-still','▶');v.replaceWith(still);});copy.querySelectorAll('button,a').forEach(n=>n.tabIndex=-1);return copy;}
   function turn(delta){const target=index+delta;if(opening||turning||target<0||target>=rows.length||!opened)return;pauseVideos();if(reduced()){index=target;draw();return;}
     turning=true;const leaf=$('#turnLeaf');leaf.classList.remove('flipping-next','flipping-prev');leaf.hidden=false;leaf.style.left=delta>0?'50%':'0';leaf.style.transformOrigin=delta>0?'left center':'right center';
     leaf.querySelector('.turn-front').replaceChildren(snapshot(delta>0?'#bookRight':'#bookLeft'));leaf.querySelector('.turn-back').replaceChildren(pageContent(rows[target],target,delta>0?'left':'right'));
     $('#bookSpread').classList.add('is-turning');$('#previousPage').disabled=true;$('#nextPage').disabled=true;$('#closeBook').disabled=true;
-    void leaf.offsetWidth;leaf.classList.add(delta>0?'flipping-next':'flipping-prev');
-    midTimer=setTimeout(()=>{index=target;draw();},480);endTimer=setTimeout(()=>{cancelTurn();draw();},960);
+    $(delta>0?'#bookRight':'#bookLeft').replaceChildren(pageContent(rows[target],target,delta>0?'right':'left'));void leaf.offsetWidth;leaf.classList.add(delta>0?'flipping-next':'flipping-prev');
+    midTimer=setTimeout(()=>{index=target;draw();},600);endTimer=setTimeout(()=>{cancelTurn();draw();},1200);
   }
-  function animateOpen(){if(opening||opened)return;if(reduced()){setOpen(true);return;}const coverRect=$('#openBook').getBoundingClientRect(),hostRect=host.getBoundingClientRect();host.style.setProperty('--open-top',(coverRect.top-hostRect.top)+'px');host.style.setProperty('--open-width',coverRect.width+'px');opening=true;draw();$('#bookReader').hidden=false;host.classList.add('book-opening');openTimer=setTimeout(()=>setOpen(true),1050);}
+  function animateOpen(){if(opening||opened)return;if(reduced()){setOpen(true);return;}const coverRect=$('#openBook').getBoundingClientRect(),hostRect=host.getBoundingClientRect();host.style.setProperty('--open-top',(coverRect.top-hostRect.top)+'px');host.style.setProperty('--open-width',coverRect.width+'px');opening=true;draw();$('#bookReader').hidden=false;host.classList.add('book-opening');openTimer=setTimeout(()=>setOpen(true),1400);}
   function editCurrent(){if(turning||opening||!rows[index])return;pauseVideos();config.onEdit?.(rows[index],isDemo());}
   $('#bookEdit').onclick=editCurrent;
   $('#openBook').onclick=animateOpen;$('#closeBook').onclick=()=>setOpen(false);$('#previousPage').onclick=()=>turn(-1);$('#nextPage').onclick=()=>turn(1);$('#bookAdd').onclick=()=>config.onAdd?.();
-  $('#bookMode').onchange=()=>{cancelTurn();mode=$('#bookMode').value;index=0;rows=computeRows();cover();if(opened)draw();};
-  document.addEventListener('keydown',e=>{if(!opened||$('#growthView').hidden||$('dialog[open]')||e.target.closest?.('input,textarea,select,video,[contenteditable="true"]'))return;if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();turn(e.key==='ArrowRight'?1:-1);}});
+  $('#bookMode').onchange=()=>{if(opening)setOpen(false);cancelTurn();mode=$('#bookMode').value;index=0;rows=computeRows();cover();if(opened)draw();syncLayout();};
+  document.addEventListener('keydown',e=>{if(layout!=='book'||!opened||$('#growthView').hidden||$('dialog[open]')||e.target.closest?.('input,textarea,select,video,[contenteditable="true"]'))return;if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();turn(e.key==='ArrowRight'?1:-1);}});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){pauseVideos();cancelTurn();if(opened)draw();}});
   window.PawJournal={
-    update(next){const oldId=rows[index]?.id;cancelTurn();config=next;rows=computeRows();const found=rows.findIndex(r=>r.id===oldId);index=found<0?0:found;cover();if(opened)draw();},
+    update(next){if(opening)setOpen(false);const oldId=rows[index]?.id;cancelTurn();config=next;rows=computeRows();const found=rows.findIndex(r=>r.id===oldId);index=found<0?0:found;cover();if(opened)draw();syncLayout();},
     close(){setOpen(false);},deactivate(){if(opening)setOpen(false);pauseVideos();cancelTurn();},
     reveal(id){mode='real';rows=computeRows();index=Math.max(0,rows.findIndex(r=>r.id===id));cover();setOpen(true);},
-    getState(){return {open:opened,index,count:rows.length,demo:isDemo(),turning,opening};}
+    getState(){return {open:opened,index,count:rows.length,demo:isDemo(),turning,opening,layout,motion};}
   };
   // Automatic drift; hovering steers toward that half without exposing a scrollbar.
   const strip=$('#originalGrid'),toggle=$('#photoMotionToggle');let direction=1,userPause=reduced(),hoverDirection=0,focused=false,holdUntil=0,last=0;

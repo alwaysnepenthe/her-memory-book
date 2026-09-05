@@ -1,6 +1,6 @@
 {
   "name": "paw-journal",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "A local-first pet daily journal with an ornate botanical book cover, page turns, profiles and media.",
   "engines": {
