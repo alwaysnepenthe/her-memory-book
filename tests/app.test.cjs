@@ -3,7 +3,7 @@ const {JSDOM}=require('jsdom'),{IDBFactory}=require('fake-indexeddb');
 const root=path.resolve(__dirname,'..'),C=require('../core.js');
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN1sAAAAASUVORK5CYII=';
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
-async function until(fn){for(let i=0;i<120;i++){if(fn())return;await delay(10);}throw Error('UI operation did not finish');}
+async function until(fn){for(let i=0;i<250;i++){if(fn())return;await delay(10);}throw Error('UI operation did not finish');}
 async function launch(factory,cleanup){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://example.invalid/',runScripts:'outside-only'}),w=dom.window;cleanup.push(()=>w.close());
  w.indexedDB=factory;w.structuredClone=structuredClone;w.scrollTo=()=>{};
@@ -32,7 +32,7 @@ test('empty public app, uploads, persistence, CRUD and full backup',async()=>{
  a.$('[data-view="profile"]').click();a.$('#profileName').value='测试小猫';a.$('#profileBirthday').value='2022-05-10';a.$('#profileBirthPlace').value='测试地点';
  const f=new a.w.File([Buffer.from(png.split(',')[1],'base64')],'portrait.png',{type:'image/png'});
  Object.defineProperty(a.$('#avatarInput'),'files',{value:[f],configurable:true});a.change('#avatarInput');await until(()=>!a.$('#saveProfile').disabled && a.$('#avatarPreview').src.startsWith('data:'));
- a.submit('#profileForm');await until(()=>a.$('#passportName').textContent==='测试小猫');assert.equal(a.$('#profilePhoto').src,png);
+ a.submit('#profileForm');await until(()=>a.$('#passportName').textContent==='测试小猫');assert.equal(a.$('#profilePhoto').src,png);assert.equal(a.$('#diaryBrand').textContent,'测试小猫日记');assert.equal(a.$('#diaryFooter').textContent,'测试小猫日记');assert.equal(a.w.document.title,'测试小猫日记 · 宠物记录册');
  a.$('[data-add="growth"]').click();a.$('#recordDate').value='2023-06-01';a.$('#recordTitle').value='<b>长大一点</b>';a.$('#recordWeight').value='2.35';
  const media=new a.w.File(['sample'],'sample.mp4',{type:'video/mp4'});Object.defineProperty(a.$('#mediaInput'),'files',{value:[media],configurable:true});a.change('#mediaInput');await until(()=>a.$('#selectedMedia').children.length===1&&!a.$('#saveRecord').disabled);
  a.submit('#recordForm');await until(()=>!a.$('#editor').open);assert.equal(a.$('#growthList h2 b'),null);assert.ok(a.$('#growthList').textContent.includes('2.35'));
@@ -52,18 +52,20 @@ test('empty public app, uploads, persistence, CRUD and full backup',async()=>{
 test('book cover, bidirectional page turns, demo isolation and photo-strip pause',async()=>{
  const cleanup=[];try{
  const a=await launch(new IDBFactory(),cleanup);a.$('[data-view="growth"]').click();
- assert.equal(a.$('#bookCoverStage').hidden,false);assert.equal(a.w.PawJournal.getState().count,4);assert.ok(!a.$('#demoNotice').hidden);
- a.$('#openBook').click();assert.equal(a.$('#bookReader').hidden,false);assert.equal(a.$('#previousPage').disabled,true);assert.ok(a.$('#bookLeft').textContent.includes('到家的第一个下午'));
+ assert.equal(a.$('#bookCoverStage').hidden,false);assert.equal(a.w.PawJournal.getState().count,4);assert.equal(a.$('#demoNotice'),null);
+ a.$('#openBook').click();assert.equal(a.w.PawJournal.getState().opening,true);a.$('#openBook').click();await until(()=>!a.w.PawJournal.getState().opening);assert.equal(a.$('#bookReader').hidden,false);assert.equal(a.$('#previousPage').disabled,true);assert.ok(a.$('#bookLeft').textContent.includes('到家的第一个下午'));
  a.$('#nextPage').click();a.$('#nextPage').click();await until(()=>!a.w.PawJournal.getState().turning);assert.equal(a.w.PawJournal.getState().index,1);
  a.$('#previousPage').click();await until(()=>!a.w.PawJournal.getState().turning);assert.equal(a.w.PawJournal.getState().index,0);
  for(let i=0;i<2;i++){a.$('#nextPage').click();await until(()=>!a.w.PawJournal.getState().turning);}
- assert.ok(a.$('#bookRight video').controls);assert.ok(a.$('#bookRight').textContent.includes('非真实录像'));
+ assert.ok(a.$('#bookRight video').controls);assert.ok(a.$('#bookRight').textContent.includes('照片片段'));
  a.$('#nextPage').click();await until(()=>!a.w.PawJournal.getState().turning);assert.equal(a.$('#nextPage').disabled,true);
  a.$('#exportButton').click();await until(()=>a.w.exported);const pack=await new Promise(resolve=>{const r=new a.w.FileReader();r.onload=()=>resolve(JSON.parse(r.result));r.readAsText(a.w.exported);});assert.equal(pack.records.length,0,'demos never enter backups');
  a.$('#bookMode').value='real';a.change('#bookMode');assert.equal(a.w.PawJournal.getState().count,0);assert.ok(a.$('#bookLeft').textContent.includes('等你来写'));
  a.$('[data-view="home"]').click();const strip=a.$('#originalGrid');Object.defineProperty(strip,'scrollWidth',{value:900,configurable:true});Object.defineProperty(strip,'clientWidth',{value:300,configurable:true});
  a.w.nextFrame(1000);a.w.nextFrame(1045);assert.ok(strip.scrollLeft>0);const current=strip.scrollLeft;a.$('#photoMotionToggle').click();a.w.nextFrame(1090);assert.equal(strip.scrollLeft,current);
  a.$('#photoMotionToggle').click();strip.scrollLeft=599.8;a.w.nextFrame(1135);assert.equal(strip.scrollLeft,600);a.w.nextFrame(1180);assert.ok(strip.scrollLeft<600,'reverses at end');
- strip.dispatchEvent(new a.w.Event('pointerenter'));const held=strip.scrollLeft;a.w.nextFrame(1225);assert.equal(strip.scrollLeft,held);assert.equal(a.errors.length,0);
+ strip.getBoundingClientRect=()=>({left:0,width:300});strip.scrollLeft=300;strip.dispatchEvent(new a.w.MouseEvent('pointermove',{clientX:20}));a.w.nextFrame(1225);assert.ok(strip.scrollLeft<300);const left=strip.scrollLeft;strip.dispatchEvent(new a.w.MouseEvent('pointermove',{clientX:280}));a.w.nextFrame(1270);assert.ok(strip.scrollLeft>left);a.$('#photoMotionToggle').click();const stopped=strip.scrollLeft;a.w.nextFrame(1315);assert.equal(strip.scrollLeft,stopped);assert.equal(a.errors.length,0);
  }finally{cleanup.forEach(f=>f());}
 });
+
+test('edit current preset deliberately creates one record; editing saved page keeps identity',async()=>{const cleanup=[];try{const a=await launch(new IDBFactory(),cleanup);a.$('[data-view="growth"]').click();a.$('#openBook').click();await until(()=>!a.w.PawJournal.getState().opening);a.$('#bookEdit').click();assert.equal(a.$('#editor').open,true);assert.equal(a.$('#recordTitle').value,'到家的第一个下午');a.$('#recordTitle').value='点点的第一天';a.submit('#recordForm');await until(()=>!a.$('#editor').open);assert.ok(a.$('#saveState').textContent.includes('1 条'));assert.ok(a.$('#bookLeft').textContent.includes('点点的第一天'));a.$('#bookEdit').click();a.$('#recordTitle').value='点点的新日常';a.$('#recordWeight').value='2.4';a.submit('#recordForm');await until(()=>!a.$('#editor').open);assert.ok(a.$('#saveState').textContent.includes('1 条'));assert.ok(a.$('#bookLeft').textContent.includes('点点的新日常'));assert.ok(a.$('#bookLeft').textContent.includes('2.4'));assert.equal(a.errors.length,0);}finally{cleanup.forEach(f=>f());}});
