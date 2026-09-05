@@ -13,7 +13,11 @@
     {id:'demo-arrival',type:'growth',date:'2026-03-08',title:'到家的第一个下午',weight:1.2,notes:'小小的鼻子先探了出来，接着是一只试探的爪子。\n\n我们把毯子铺在窗边，让新朋友自己慢慢熟悉房间。今天不用着急，先好好认识彼此。',media:[photo(4),photo(3)]},
     {id:'demo-sunshine',type:'growth',date:'2026-04-12',title:'找到最喜欢的阳光',weight:1.55,notes:'下午三点，阳光刚好落在那块小垫子上。\n\n吃完饭，她就把自己团成一个小圆圈。耳朵偶尔动一下，大概连梦也是软软的。\n\n今日小发现：最喜欢被轻轻摸下巴。',media:[photo(0),photo(5)]},
     {id:'demo-video',type:'growth',date:'2026-05-20',title:'把今天，录成一小段',weight:1.9,notes:'把今天的照片，连成一小段温柔的片刻。\n\n午后的光慢慢走过窗边。她抬起头，看了看我，又安心地待在原地。\n\n不用每一天都很特别，我们一起度过就很好。',media:[video]},
-    {id:'demo-everyday',type:'growth',date:'2026-06-16',title:'普通的一天，也很可爱',weight:2.15,notes:'今天没有什么大事。一起吃饭、玩了一会儿，窗外的树影晃来晃去。\n\n但这些普通的日常，慢慢变成了我们一起长大的故事。\n\n下次再翻开，就从新的一页开始吧。',media:[photo(1),photo(2)]}
+    {id:'demo-everyday',type:'growth',date:'2026-06-16',title:'普通的一天，也很可爱',weight:2.15,notes:'今天没有什么大事。一起吃饭、玩了一会儿，窗外的树影晃来晃去。\n\n但这些普通的日常，慢慢变成了我们一起长大的故事。\n\n下次再翻开，就从新的一页开始吧。',media:[photo(1),photo(2)]},
+    {"id":"demo-window","type":"growth","date":"2026-07-02","title":"窗边的小小观察员","weight":2.3,"notes":"窗外有一片叶子晃了很久，她也认真看了很久。\n\n先坐得端端正正，再悄悄伸长脖子。最后回过头，像是想把刚刚发现的秘密告诉我。\n\n今天的照片只留一张，留给这个专注的小表情。",media:[photo(3)]},
+    {"id":"demo-stretch","type":"growth","date":"2026-07-19","title":"一整天的小模样","weight":null,"notes":"醒来的时候，先伸一个很长很长的懒腰。\n\n玩累了就趴一会儿，听到一点动静又抬起头。等房间安静下来，就把尾巴收好，重新睡成一个小团子。\n\n把几个小模样贴在同一页，就像收藏了一整天。",media:[photo(1),photo(5),photo(0)]},
+    {"id":"demo-letter","type":"growth","date":"2026-08-08","title":"写给今天的一封小信","weight":null,"notes":"亲爱的小伙伴：\n\n今天没有举起相机。\n\n你在旁边睡觉，我把手边的事情慢慢做完。偶尔低头看看你，发现你也正眯着眼睛看我。\n\n原来一起生活，就是这些不用特意安排的时刻。窗帘被风吹起来，屋子里有一点暖光，还有你平稳的呼吸。\n\n这一页不贴照片，只把今天的心情写下来。\n\n愿明天也有一个舒服的午觉。",media:[]},
+    {"id":"demo-afternoon","type":"growth","date":"2026-08-23","title":"让这个午后慢一点","weight":2.65,"notes":"一张照片，和一小段流动的光。\n\n照片留下眼睛里的神气，小片段留下午后的节奏。翻到这里的时候，也把自己的脚步放慢一点。\n\n今天的小事：吃得很认真，玩得很投入，睡得很香。",media:[video,photo(4)]}
   ];
   let config={records:[],pet:{name:'点点'},filters:{type:'growth',ascending:true}},rows=[],index=0,mode='auto',opened=false,turning=false,opening=false,openTimer,midTimer,endTimer;
   host.className='journal-stage';
@@ -36,7 +40,7 @@
       content.append(el('div','journal-rule','❧'),el('div','paper-notes',record.notes||'这一天的故事，先交给照片。'));
       const foot=el('div','entry-actions'),edit=el('button','text-button','✎ 编辑本页');edit.onclick=()=>{if(turning||opening)return;pauseVideos();config.onEdit?.(record,isDemo());};foot.append(edit);content.append(foot);
     }else{
-      const media=el('div','journal-media');if(!record.media.length){media.append(el('div','journal-no-photo','❦'),el('p','','今天先写文字，下次再贴照片。'));}
+      const media=el('div','journal-media');if(record.media.length>=3)media.classList.add('photo-montage');if(record.media.length===1&&record.media[0].mime.startsWith('image/'))media.classList.add('single-portrait');if(!record.media.length){media.append(el('div','journal-no-photo','❦'),el('p','','今天先写文字，下次再贴照片。'));}
       record.media.forEach((m,i)=>{const figure=el('figure','journal-photo');
         if(m.mime.startsWith('video/')){figure.classList.add('journal-video');const v=el('video');v.src=m.data;v.controls=true;v.playsInline=true;v.preload='metadata';v.setAttribute('aria-label',m.name);v.poster=photo(3).data;figure.append(v);v.addEventListener('error',()=>{caption.textContent='当前浏览器不支持此视频编码，可下载原文件。';});const a=el('a','video-download','下载原视频');a.href=m.data;a.download=m.name+'.mp4';figure.append(a);}
         else{const b=el('button','journal-image-button');b.setAttribute('aria-label','查看照片 '+(i+1));const img=el('img');img.src=m.data;img.alt=m.name;img.loading='lazy';b.append(img);b.onclick=()=>{pauseVideos();if(isDemo())config.onPreview?.(m,record.title);else config.onOpen?.(record.id);};figure.append(b);}
