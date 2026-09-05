@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+*.log
+.DS_Store
+Thumbs.db
+*纪念册备份*.json
+*memory-book-backup*.json
+backups/
+uploads/
+personal/

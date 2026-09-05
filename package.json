@@ -1,0 +1,16 @@
+{
+  "name": "her-memory-book",
+  "version": "0.3.0",
+  "private": true,
+  "description": "A local-first pet profile, growth journal and memory book.",
+  "engines": {"node": "^22.22.2 || ^24.15.0 || >=26.0.0"},
+  "scripts": {
+    "dev": "node scripts/serve.cjs",
+    "build": "node scripts/build.cjs",
+    "test": "node --test tests/app.test.cjs"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "6.2.5",
+    "jsdom": "30.0.1"
+  }
+}
